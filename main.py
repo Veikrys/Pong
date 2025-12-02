@@ -35,8 +35,26 @@ ball_speed_y = 5
 
 player_score = 0
 cpu_score = 0
-winning_score = 5
+winning_score = 1
 game_over = False
+victory_sound_played = False
+
+# Инициализация микшера для звука
+pygame.mixer.init()
+
+def load_sound(name):
+    try:
+        sound = pygame.mixer.Sound(f"sounds/{name}")
+        return sound
+    except pygame.error as e:
+        print(f"Не удалось загрузить звук {name}: {e}")
+        return None
+
+bounce_paddle_sound = load_sound("paddle.wav")
+bounce_wall_sound = load_sound("wall.wav")
+score_sound = load_sound("score.wav")
+victory_sound = load_sound("victory.mp3")
+lose_sound = load_sound("lose.wav")
 
 #игровой цикл
 while True:
@@ -62,12 +80,18 @@ while True:
 
     if ball.top <= 0 or ball.bottom >= HEIGHT:
         ball_speed_y *= -1.1
+        if bounce_wall_sound:
+            bounce_wall_sound.play()    
 
     if ball.colliderect(player_paddle) or ball.colliderect(cpu_paddle):
         ball_speed_x *= -1.1
+        if bounce_paddle_sound:
+            bounce_paddle_sound.play()
 
     if ball.left <= 0:
         cpu_score += 1
+        if score_sound:
+            score_sound.play()
         ball.center = (WIDTH // 2, HEIGHT // 2)
         ball_speed_x = 5
         ball_speed_y = 5
@@ -75,6 +99,8 @@ while True:
     
     if ball.right >= WIDTH:
         player_score += 1
+        if score_sound:
+            score_sound.play()
         ball.center = (WIDTH // 2, HEIGHT // 2)
         ball_speed_x = 5
         ball_speed_y = 5
@@ -88,6 +114,17 @@ while True:
     
     if player_score >= winning_score or cpu_score >= winning_score:
         game_over = True
+        victory_sound_played = True
+
+    if victory_sound_played:
+            if player_score >= winning_score:
+                if victory_sound:
+                    victory_sound.play()
+            else:
+                if lose_sound:
+                    lose_sound.play()
+    
+    victory_sound_played = False
 
     screen.fill(BLACK)
     pygame.draw.rect(screen, WHITE, player_paddle, 5)
