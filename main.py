@@ -26,5 +26,11 @@ while True:
 
     
     screen.fill(BLACK)
+
     pygame.display.update()
     clock.tick(FPS)
+
+PADDLE_WITH, PADDLE_HEIGHT = 20, 200
+PADDLE_SPEED = 10
+
+player_paddle = pygame.Rect(50, HEIGHT // 2 - PADDLE_HEIGHT // 2, PADDLE_WIDTH, PADDLE_HEIGHT)
