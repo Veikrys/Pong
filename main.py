@@ -14,6 +14,8 @@ window_center = pygame.display.get_surface().get_rect().center
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GREY = (130, 130, 130)
+RED = (255, 0, 0)
+GREEN = (0, 255, 0)
 font = pygame.font.SysFont("Comic Sans MS", 64)
 
 #частота обновления экрана
@@ -33,7 +35,7 @@ ball_speed_y = 5
 
 player_score = 0
 cpu_score = 0
-winning_score = 3
+winning_score = 5
 game_over = False
 
 #игровой цикл
@@ -97,6 +99,26 @@ while True:
     screen.blit(score_text, (window_center[0] - score_text.get_width() // 2, window_center[1] // 10))
 
     pygame.draw.ellipse(screen, WHITE, ball, 5)
+
+    if game_over:
+        status_winner = True
+        ball.center = (WIDTH // 2, HEIGHT // 2)
+        ball_speed_x = 0
+        ball_speed_y = 0
+        winner = "Ты выиграл!" if player_score >= winning_score else "Скайнет победил!" 
+        status_winner = False if winner == "Скайнет победил!" else True
+        over_text = font.render(winner, True, BLACK, GREEN if status_winner == True else RED)
+        restart_text = font.render("Нажми R чтобы начать заново", True, WHITE, GREY)
+        screen.blit(over_text, (WIDTH // 2 - over_text.get_width() // 2, HEIGHT // 2 - 50))
+        screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT // 2 + 50))
+
+        # Перезапуск
+        if keys[pygame.K_r]:
+            player_score = 0
+            cpu_score = 0
+            game_over = False
+            ball_speed_x = 5
+            ball_speed_y = 5
 
     pygame.display.update()
     clock.tick(FPS)
