@@ -53,6 +53,7 @@ key_down = False   # защита от повтора при удержании
 key_up = False
 
 # Инициализация микшера для звука
+pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.mixer.init()
 
 def draw_menu():
@@ -89,6 +90,12 @@ bounce_wall_sound = load_sound("wall.wav")
 score_sound = load_sound("score.wav")
 victory_sound = load_sound("victory.mp3")
 lose_sound = load_sound("lose.wav")
+menu_music = load_sound("menu.wav")
+
+music_channel = pygame.mixer.Channel(0)
+
+music_channel.play(menu_music, -1)
+music_channel.set_volume(0.5)
 
 #игровой цикл
 while True:
@@ -96,7 +103,6 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-
     
     # screen.fill(BLACK)
 
@@ -106,6 +112,7 @@ while True:
     keys = pygame.key.get_pressed()
 
     if game_state == "MENU":
+
         # Управление меню
         if keys[pygame.K_s] and not key_down:
             menu_selection = (menu_selection + 1) % len(menu_options)
@@ -123,6 +130,7 @@ while True:
             if menu_selection == 0:  # PvP
                 game_mode = "PVP"
                 game_state = "GAME"
+                music_channel.stop()
                 player_score = 0
                 cpu_score = 0
                 game_over = False
@@ -131,6 +139,7 @@ while True:
             elif menu_selection == 1:  # PvE
                 game_mode = "PVE"
                 game_state = "GAME"
+                music_channel.stop()
                 player_score = 0
                 cpu_score = 0
                 game_over = False
@@ -156,6 +165,8 @@ while True:
             ball.center = (WIDTH // 2, HEIGHT // 2)
             # ball_speed_x = 0
             # ball_speed_y = 0
+            music_channel.play(menu_music, -1)
+            music_channel.set_volume(0.5)
 
         ball.x += ball_speed_x
         ball.y += ball_speed_y
