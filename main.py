@@ -37,7 +37,7 @@ player_score = 0
 cpu_score = 0
 winning_score = 1
 game_over = False
-victory_sound_played = False
+victory_sound_played = True
 
 # Инициализация микшера для звука
 pygame.mixer.init()
@@ -114,17 +114,20 @@ while True:
     
     if player_score >= winning_score or cpu_score >= winning_score:
         game_over = True
-        victory_sound_played = True
+        # victory_sound_played = True if victory_sound_played != True else False
 
     if victory_sound_played:
             if player_score >= winning_score:
                 if victory_sound:
                     victory_sound.play()
-            else:
+                    victory_sound_played = False
+
+            if cpu_score >= winning_score:
                 if lose_sound:
                     lose_sound.play()
+                    victory_sound_played = False
     
-    victory_sound_played = False
+    # victory_sound_played = False
 
     screen.fill(BLACK)
     pygame.draw.rect(screen, WHITE, player_paddle, 5)
@@ -156,6 +159,7 @@ while True:
             game_over = False
             ball_speed_x = 5
             ball_speed_y = 5
+            victory_sound_played = True
 
     pygame.display.update()
     clock.tick(FPS)
