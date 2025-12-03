@@ -17,6 +17,8 @@ GREY = (130, 130, 130)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 font = pygame.font.SysFont("Comic Sans MS", 64)
+title_font = pygame.font.SysFont("Comic Sans MS", 88, bold=True)
+menu_font = pygame.font.SysFont("Comic Sans MS", 50)
 
 #частота обновления экрана
 FPS = 60
@@ -39,8 +41,40 @@ winning_score = 1
 game_over = False
 victory_sound_played = True
 
+# Состояние игры
+game_state = "MENU"  # Может быть: "MENU" или "GAME"
+
+# Выбор в меню
+menu_selection = 0  # 0: PvP, 1: PvE, 2: Выход
+menu_options = ["Игрок против игрока", "Игрок против машины", "Выход"]
+
+game_mode = "PVE"  # по умолчанию
+key_down = False   # защита от повтора при удержании
+key_up = False
+
 # Инициализация микшера для звука
 pygame.mixer.init()
+
+def draw_menu():
+    screen.fill(BLACK)
+    
+    # Заголовок
+    title = title_font.render("PONG 1972", True, WHITE)
+    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 4))
+
+    # Кнопки
+    for i, option in enumerate(menu_options):
+        color = GREEN if i == menu_selection and i != 2 else WHITE
+        if i == menu_selection and i == 2:
+            color = RED
+        outline = 5 if i == 2 else 0  # Красная рамка только у "Выход"
+        button_text = menu_font.render(option, True, color)
+        rect = button_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + i * 80))
+        screen.blit(button_text, rect)
+        
+        # Окантовка для "Выход"
+        # if i == 2:
+        #     pygame.draw.rect(screen, RED, rect, outline)
 
 def load_sound(name):
     try:
@@ -70,82 +104,141 @@ while True:
     # clock.tick(FPS)
 
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_UP] and player_paddle.top > 0:
-        player_paddle.y -= PADDLE_SPEED
-    if keys[pygame.K_DOWN] and player_paddle.bottom < HEIGHT:
-        player_paddle.y += PADDLE_SPEED
 
-    ball.x += ball_speed_x
-    ball.y += ball_speed_y
+    if game_state == "MENU":
+        # Управление меню
+        if keys[pygame.K_s] and not key_down:
+            menu_selection = (menu_selection + 1) % len(menu_options)
+            key_down = True
+        if keys[pygame.K_w] and not key_up:
+            menu_selection = (menu_selection - 1) % len(menu_options)
+            key_up = True
+        if not keys[pygame.K_s]:
+            key_down = False
+        if not keys[pygame.K_w]:
+            key_up = False
 
-    if ball.top <= 0 or ball.bottom >= HEIGHT:
-        ball_speed_y *= -1.1
-        if bounce_wall_sound:
-            bounce_wall_sound.play()    
+        # Выбор
+        if keys[pygame.K_RETURN]:
+            if menu_selection == 0:  # PvP
+                game_mode = "PVP"
+                game_state = "GAME"
+                player_score = 0
+                cpu_score = 0
+                game_over = False
+                victory_sound_played = True
+                ball.center = (WIDTH // 2, HEIGHT // 2)
+            elif menu_selection == 1:  # PvE
+                game_mode = "PVE"
+                game_state = "GAME"
+                player_score = 0
+                cpu_score = 0
+                game_over = False
+                victory_sound_played = True
+                ball.center = (WIDTH // 2, HEIGHT // 2)
+            elif menu_selection == 2:  # Выход
+                pygame.quit()
+                sys.exit()
 
-    if ball.colliderect(player_paddle) or ball.colliderect(cpu_paddle):
-        ball_speed_x *= -1.1
-        if bounce_paddle_sound:
-            bounce_paddle_sound.play()
+        draw_menu()
 
-    if ball.left <= 0:
-        cpu_score += 1
-        if score_sound:
-            score_sound.play()
-        ball.center = (WIDTH // 2, HEIGHT // 2)
-        ball_speed_x = 5
-        ball_speed_y = 5
-        ball_speed_x *= +1.5
-    
-    if ball.right >= WIDTH:
-        player_score += 1
-        if score_sound:
-            score_sound.play()
-        ball.center = (WIDTH // 2, HEIGHT // 2)
-        ball_speed_x = 5
-        ball_speed_y = 5
-        ball_speed_x *= -1.5
+    elif game_state == "GAME":
 
-    if cpu_paddle.centery < ball.centery and cpu_paddle.bottom < HEIGHT:
-        cpu_paddle.y += PADDLE_SPEED * 0.85 
+        if keys[pygame.K_w] and player_paddle.top > 0:
+            player_paddle.y -= PADDLE_SPEED
+        if keys[pygame.K_s] and player_paddle.bottom < HEIGHT:
+            player_paddle.y += PADDLE_SPEED
+        if keys[pygame.K_ESCAPE]:
+            game_state = "MENU"
+            player_score = 0
+            cpu_score = 0
+            game_over = False
+            ball.center = (WIDTH // 2, HEIGHT // 2)
+            # ball_speed_x = 0
+            # ball_speed_y = 0
 
-    if cpu_paddle.centery > ball.centery and cpu_paddle.top > 0:
-        cpu_paddle.y -= PADDLE_SPEED * 0.85
-    
-    if player_score >= winning_score or cpu_score >= winning_score:
-        game_over = True
-        # victory_sound_played = True if victory_sound_played != True else False
+        ball.x += ball_speed_x
+        ball.y += ball_speed_y
 
-    if victory_sound_played:
-            if player_score >= winning_score:
-                if victory_sound:
-                    victory_sound.play()
-                    victory_sound_played = False
+        if ball.top <= 0 or ball.bottom >= HEIGHT:
+            ball_speed_y *= -1.1
+            if bounce_wall_sound:
+                bounce_wall_sound.play()    
 
-            if cpu_score >= winning_score:
-                if lose_sound:
-                    lose_sound.play()
-                    victory_sound_played = False
+        if ball.colliderect(player_paddle) or ball.colliderect(cpu_paddle):
+            ball_speed_x *= -1.1
+            if bounce_paddle_sound:
+                bounce_paddle_sound.play()
+
+        if ball.left <= 0:
+            cpu_score += 1
+            if score_sound:
+                score_sound.play()
+            ball.center = (WIDTH // 2, HEIGHT // 2)
+            ball_speed_x = 5
+            ball_speed_y = 5
+            ball_speed_x *= +1.5
+        
+        if ball.right >= WIDTH:
+            player_score += 1
+            if score_sound:
+                score_sound.play()
+            ball.center = (WIDTH // 2, HEIGHT // 2)
+            ball_speed_x = 5
+            ball_speed_y = 5
+            ball_speed_x *= -1.5
+
+        if game_mode == "PVE" and not game_over:
+                # ИИ управляет правой ракеткой
+                if cpu_paddle.centery < ball.centery and cpu_paddle.bottom < HEIGHT:
+                    cpu_paddle.y += PADDLE_SPEED * 0.85
+                if cpu_paddle.centery > ball.centery and cpu_paddle.top > 0:
+                    cpu_paddle.y -= PADDLE_SPEED * 0.85
+
+        elif game_mode == "PVP" and not game_over:
+                # Игрок 2 управляет правой ракеткой: W и S
+                if keys[pygame.K_UP] and cpu_paddle.top > 0:
+                    cpu_paddle.y -= PADDLE_SPEED
+                if keys[pygame.K_DOWN] and cpu_paddle.bottom < HEIGHT:
+                    cpu_paddle.y += PADDLE_SPEED
+                lose_sound = victory_sound
+        
+        if player_score >= winning_score or cpu_score >= winning_score:
+            game_over = True
+            # victory_sound_played = True if victory_sound_played != True else False
+
+        if victory_sound_played:
+                if player_score >= winning_score:
+                    if victory_sound:
+                        victory_sound.play()
+                        victory_sound_played = False
+
+                if cpu_score >= winning_score:
+                    if lose_sound:
+                        lose_sound.play()
+                        victory_sound_played = False
+        
+        screen.fill(BLACK)
+        pygame.draw.rect(screen, WHITE, player_paddle, 5)
+        pygame.draw.rect(screen, WHITE, cpu_paddle, 5)
+        pygame.draw.aaline(screen, WHITE, (WIDTH // 2, 0), (WIDTH // 2, HEIGHT), True)
+
+        score_text = font.render(f"| {player_score} : {cpu_score} |", True, WHITE, GREY)
+        screen.blit(score_text, (window_center[0] - score_text.get_width() // 2, window_center[1] // 10))
+
+        pygame.draw.ellipse(screen, WHITE, ball, 5)
     
     # victory_sound_played = False
-
-    screen.fill(BLACK)
-    pygame.draw.rect(screen, WHITE, player_paddle, 5)
-    pygame.draw.rect(screen, WHITE, cpu_paddle, 5)
-
-    pygame.draw.aaline(screen, WHITE, (WIDTH // 2, 0), (WIDTH // 2, HEIGHT), True)
-
-    score_text = font.render(f"| {player_score} : {cpu_score} |", True, WHITE, GREY)
-    screen.blit(score_text, (window_center[0] - score_text.get_width() // 2, window_center[1] // 10))
-
-    pygame.draw.ellipse(screen, WHITE, ball, 5)
 
     if game_over:
         status_winner = True
         ball.center = (WIDTH // 2, HEIGHT // 2)
-        ball_speed_x = 0
-        ball_speed_y = 0
-        winner = "Ты выиграл!" if player_score >= winning_score else "Скайнет победил!" 
+        # ball_speed_x = 0
+        # ball_speed_y = 0
+        if game_mode == "PVP":
+            winner = "Победил игрок слева!" if player_score >= winning_score else "Победил игрок справа!"
+        else:
+            winner = "Ты выиграл!" if player_score >= winning_score else "Скайнет победил!"
         status_winner = False if winner == "Скайнет победил!" else True
         over_text = font.render(winner, True, BLACK, GREEN if status_winner == True else RED)
         restart_text = font.render("Нажми R чтобы начать заново", True, WHITE, GREY)
