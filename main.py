@@ -1,6 +1,7 @@
 
 import pygame
 import sys
+import math
 
 pygame.init()
 
@@ -16,9 +17,13 @@ BLACK = (0, 0, 0)
 GREY = (130, 130, 130)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
-font = pygame.font.SysFont("Comic Sans MS", 64)
-title_font = pygame.font.SysFont("Comic Sans MS", 88, bold=True)
-menu_font = pygame.font.SysFont("Comic Sans MS", 50)
+YELLOW = (255, 255, 0)
+BLUE = (0, 0, 255)
+
+#шрифты
+font = pygame.font.Font(".\PressStart2P.ttf", 40)
+title_font = pygame.font.Font(".\PressStart2P.ttf", 76)
+menu_font = pygame.font.Font(".\PressStart2P.ttf", 44)
 
 #частота обновления экрана
 FPS = 60
@@ -30,7 +35,7 @@ PADDLE_SPEED = 15
 player_paddle = pygame.Rect(50, HEIGHT // 2 - PADDLE_HEIGHT // 2, PADDLE_WIDTH, PADDLE_HEIGHT)
 cpu_paddle = pygame.Rect(WIDTH - 50 - PADDLE_WIDTH, HEIGHT // 2 - PADDLE_HEIGHT // 2, PADDLE_WIDTH, PADDLE_HEIGHT)
 
-BALL_SIZE = 20
+BALL_SIZE = 40
 ball = pygame.Rect(WIDTH // 2 - BALL_SIZE // 2, HEIGHT // 2 - BALL_SIZE // 2, BALL_SIZE, BALL_SIZE)
 ball_speed_x = 5
 ball_speed_y = 5
@@ -52,30 +57,62 @@ game_mode = "PVE"  # по умолчанию
 key_down = False   # защита от повтора при удержании
 key_up = False
 
+blink_timer = 0
+blink = True
+
 # Инициализация микшера для звука
 pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.mixer.init()
 
 def draw_menu():
+    global blink_timer
+
+    # Обновляем таймер (плавно увеличивается)
+    blink_timer += 0.15  # Скорость анимации
+    if blink_timer > 2 * math.pi:
+        blink_timer -= 2 * math.pi
+
+    # Мигающий цвет
+    blink_value = int((math.sin(blink_timer) + 1) * 127.5)  # От 0 до 255
+    blink_color = (blink_value, 255, blink_value)  # Цвет "светодиодного" свечения
+    blink_color_red = (255, blink_value, blink_value)
+
     screen.fill(BLACK)
-    
+
     # Заголовок
-    title = title_font.render("PONG 1972", True, WHITE)
-    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 4))
+    if blink:
+        title = title_font.render("PONG 1972", True, YELLOW)
+        screen.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 4))
+        title_outline = title_font.render("PONG 1972", True, BLUE)
+        screen.blit(title_outline, ((WIDTH // 2 - title.get_width() // 2) + 2, (HEIGHT // 4) + 2))
 
     # Кнопки
     for i, option in enumerate(menu_options):
-        color = GREEN if i == menu_selection and i != 2 else WHITE
-        if i == menu_selection and i == 2:
+        if i == menu_selection and i != 2:
+            # Выбранная кнопка — мигает
+            color = GREEN
+            color = blink_color
+        elif i == menu_selection and i == 2:
+            # Кнопка "Выход" — всегда красная
             color = RED
-        outline = 5 if i == 2 else 0  # Красная рамка только у "Выход"
+            color = blink_color_red
+        else:
+            # Остальные — обычные
+            color = WHITE
+
+        # if blink:
         button_text = menu_font.render(option, True, color)
         rect = button_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + i * 80))
         screen.blit(button_text, rect)
-        
-        # Окантовка для "Выход"
+
+        # Добавим лёгкую "окантовку" для выделенной кнопки
+        # if i == menu_selection:
+        #     outline_rect = rect.inflate(20, 10)  # Увеличиваем рамку
+        #     pygame.draw.rect(screen, blink_color, outline_rect, 3, border_radius=12)
+        # # Красная окантовка у "Выход"
         # if i == 2:
-        #     pygame.draw.rect(screen, RED, rect, outline)
+        #     outline_rect = rect.inflate(15, 8)
+        #     pygame.draw.rect(screen, RED, outline_rect, 3, border_radius=10)
 
 def load_sound(name):
     try:
@@ -91,11 +128,12 @@ score_sound = load_sound("score.wav")
 victory_sound = load_sound("victory.mp3")
 lose_sound = load_sound("lose.wav")
 menu_music = load_sound("menu.wav")
+click_sound = load_sound("click.wav")
 
 music_channel = pygame.mixer.Channel(0)
 
 music_channel.play(menu_music, -1)
-music_channel.set_volume(0.5)
+music_channel.set_volume(0.2)
 
 #игровой цикл
 while True:
@@ -103,6 +141,9 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
+
+    if pygame.time.get_ticks() % 0.5 == 0:  # каждые 0.1 сек
+        blink = not blink
     
     # screen.fill(BLACK)
 
@@ -116,9 +157,11 @@ while True:
         # Управление меню
         if keys[pygame.K_s] and not key_down:
             menu_selection = (menu_selection + 1) % len(menu_options)
+            click_sound.play()
             key_down = True
         if keys[pygame.K_w] and not key_up:
             menu_selection = (menu_selection - 1) % len(menu_options)
+            click_sound.play()
             key_up = True
         if not keys[pygame.K_s]:
             key_down = False
@@ -172,12 +215,18 @@ while True:
         ball.y += ball_speed_y
 
         if ball.top <= 0 or ball.bottom >= HEIGHT:
-            ball_speed_y *= -1.1
+            if ball_speed_y < 7:
+                ball_speed_y *= -1.1
+            else:
+                ball_speed_y *= -1             
             if bounce_wall_sound:
                 bounce_wall_sound.play()    
 
         if ball.colliderect(player_paddle) or ball.colliderect(cpu_paddle):
-            ball_speed_x *= -1.1
+            if ball_speed_x < 7:
+                ball_speed_x *= -1.1
+            else:
+                ball_speed_x *= -1
             if bounce_paddle_sound:
                 bounce_paddle_sound.play()
 
@@ -234,7 +283,7 @@ while True:
         pygame.draw.rect(screen, WHITE, cpu_paddle, 5)
         pygame.draw.aaline(screen, WHITE, (WIDTH // 2, 0), (WIDTH // 2, HEIGHT), True)
 
-        score_text = font.render(f"| {player_score} : {cpu_score} |", True, WHITE, GREY)
+        score_text = font.render(f"| {player_score} : {cpu_score} |", True, WHITE, BLACK)
         screen.blit(score_text, (window_center[0] - score_text.get_width() // 2, window_center[1] // 10))
 
         pygame.draw.ellipse(screen, WHITE, ball, 5)
@@ -247,12 +296,12 @@ while True:
         # ball_speed_x = 0
         # ball_speed_y = 0
         if game_mode == "PVP":
-            winner = "Победил игрок слева!" if player_score >= winning_score else "Победил игрок справа!"
+            winner = " Победил игрок слева! " if player_score >= winning_score else " Победил игрок справа! "
         else:
-            winner = "Ты выиграл!" if player_score >= winning_score else "Скайнет победил!"
-        status_winner = False if winner == "Скайнет победил!" else True
+            winner = " Ты выиграл! " if player_score >= winning_score else " Скайнет победил! "
+        status_winner = False if winner == " Скайнет победил! " else True
         over_text = font.render(winner, True, BLACK, GREEN if status_winner == True else RED)
-        restart_text = font.render("Нажми R чтобы начать заново", True, WHITE, GREY)
+        restart_text = font.render(" Нажми R чтобы начать заново ", True, WHITE, GREY)
         screen.blit(over_text, (WIDTH // 2 - over_text.get_width() // 2, HEIGHT // 2 - 50))
         screen.blit(restart_text, (WIDTH // 2 - restart_text.get_width() // 2, HEIGHT // 2 + 50))
 
