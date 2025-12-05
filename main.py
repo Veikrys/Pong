@@ -2,6 +2,7 @@
 import pygame
 import sys
 import math
+import random
 
 pygame.init()
 
@@ -64,6 +65,18 @@ winning_score = 1
 game_over = False
 victory_sound_played = True
 
+# Эффекты частиц
+particles = []  # Список частиц: [x, y, vx, vy, life]
+dust = []       # Пыль от стен: [x, y, speed_x, speed_y, size, color, life]
+shockwave_active = False
+shockwave_radius = 0
+shockwave_max_radius = 150
+
+# Эффект "Разгон"
+boost_alert = False
+boost_alert_timer = 0  # Сколько кадров отображать
+BOOST_ALERT_DURATION = 60  # 1 сек при 60 FPS
+
 # Состояние игры
 game_state = "MENU"  # Может быть: "MENU" или "GAME"
 
@@ -82,40 +95,22 @@ blink = True
 pygame.mixer.pre_init(44100, -16, 2, 2048)
 pygame.mixer.init()
 
-# def draw_tail(trail, color_main, color_edge=None):
-    # """
-    # Рисует шлейф из кругов вдоль траектории.
-    # Если передан color_edge — рисует кольцо (обводку).
-    # trail: список кортежей ('up'/'down', (x, y))
-    # """
-    # if not trail:
-    #     return
+def create_particles(x, y, color, count=12):
+    for _ in range(count):
+        angle = math.radians(random.randint(0, 360))
+        speed = random.uniform(1, 4)
+        vx = math.cos(angle) * speed
+        vy = math.sin(angle) * speed
+        life = random.randint(10, 20)
+        particles.append([x, y, vx, vy, life])
 
-    # for i, (direction, pos) in enumerate(trail):
-    #     alpha = int(255 * (i / len(trail)))
-    #     radius = int(PADDLE_WIDTH * 1.5 * (i / len(trail)))
-    #     if radius < 2:
-    #         continue
-
-    #     surface = pygame.Surface((radius*2, radius*2), pygame.SRCALPHA)
-        
-    #     # Основной цвет с прозрачностью
-    #     main_color = (*color_main, alpha)
-    #     pygame.draw.circle(surface, main_color, (radius, radius), radius)
-        
-    #     # Край (если нужен)
-    #     if color_edge:
-    #         edge_color = (*color_edge, int(alpha * 0.7))
-    #         pygame.draw.circle(surface, edge_color, (radius, radius), radius, 2)
-        
-    #     # Сдвигаем позицию в зависимости от направления
-    #     offset = radius
-    #     if direction == 'up':
-    #         blit_pos = (pos[0] - radius, pos[1] - offset)
-    #     else:  # 'down'
-    #         blit_pos = (pos[0] - radius, pos[1] - radius)
-
-    #     screen.blit(surface, blit_pos)
+def create_dust(x, y):
+    for _ in range(8):
+        vx = random.uniform(-2, 2)
+        vy = random.uniform(-1, 1)
+        size = random.randint(2, 4)
+        life = random.randint(8, 15)
+        dust.append([x, y, vx, vy, size, GREY, life])
 
 def draw_ball_trail(trail, color):
     if not trail:
@@ -332,7 +327,7 @@ while True:
         current_trail_length = int(min(15, ball_speed * 1.5))
 
         # === Хвосты объектов при высокой скорости мяча ===
-        if ball_speed > 12:
+        if ball_speed > 10:
             ball_trail.append((ball.centerx, ball.centery))
 
             if player_paddle.y < player_paddle_last_y:
@@ -362,6 +357,11 @@ while True:
         ball.y += ball_speed_y
 
         if ball.top <= 0 or ball.bottom >= HEIGHT:
+            if ball_speed > 5:
+                create_dust(ball.centerx, ball.top if ball.top <= 0 else ball.bottom)
+                # if not boost_alert:
+                #     boost_alert = True
+                #     boost_alert_timer = BOOST_ALERT_DURATION
             if ball_speed_y < 7:
                 ball_speed_y *= -1.1
             else:
@@ -370,6 +370,14 @@ while True:
                 bounce_wall_sound.play()    
 
         if ball.colliderect(player_paddle) or ball.colliderect(cpu_paddle):
+            if ball_speed > 15:
+                shockwave_active = True
+                shockwave_radius = 5
+                if not boost_alert:
+                    boost_alert = True
+                    boost_alert_timer = BOOST_ALERT_DURATION
+            if ball_speed > 5:
+                create_particles(ball.centerx, ball.centery, WHITE, 16)
             if ball_speed_x < 7:
                 ball_speed_x *= -1.1
             else:
@@ -409,8 +417,48 @@ while True:
                     if lose_sound:
                         lose_sound.play()
                         victory_sound_played = False
+            
+        # Обновление частиц
+        for p in particles[:]:
+            p[0] += p[2]  # x += vx
+            p[1] += p[3]  # y += vy
+            p[4] -= 0.3   # life -=
+            if p[4] <= 0:
+                particles.remove(p)
+
+        # Обновление пыли
+        for d in dust[:]:
+            d[0] += d[2]
+            d[1] += d[3]
+            d[6] -= 0.2
+            if d[6] <= 0:
+                dust.remove(d)
+
+        # Обновление волн
+        if shockwave_active:
+            shockwave_radius += 10
+            if shockwave_radius > shockwave_max_radius:
+                shockwave_active = False
+                shockwave_radius = 0
         
         screen.fill(BLACK)
+
+        # Рисуем частицы
+        for p in particles:
+            alpha = int(255 * (p[4] / 20))
+            particle_color = (WHITE[0], WHITE[1], WHITE[2], alpha)
+            particle_surf = pygame.Surface((4, 4), pygame.SRCALPHA)
+            pygame.draw.circle(particle_surf, particle_color, (2, 2), 2)
+            screen.blit(particle_surf, (p[0] - 2, p[1] - 2))
+
+        # Рисуем пыль
+        for d in dust:
+            pygame.draw.circle(screen, d[5], (int(d[0]), int(d[1])), d[4])
+
+        # Рисуем волну
+        if shockwave_active:
+            pygame.draw.circle(screen, WHITE, ball.center, int(shockwave_radius * 0.7), 3)
+            pygame.draw.circle(screen, YELLOW, ball.center, int(shockwave_radius * 0.3), 2)
 
         # Рисуем шлейфы
         draw_ball_trail(ball_trail, YELLOW)
@@ -443,6 +491,18 @@ while True:
 
         # Мяч
         pygame.draw.ellipse(screen, WHITE, ball, 5)
+
+        # Эффект "Разгон"
+        if boost_alert:
+            boost_alert_timer -= 1
+            if boost_alert_timer > 0:
+                if blink_timer % 10 < 5:
+                    boost_text = menu_font.render(" РАЗГОН! ", True, RED, YELLOW)
+                else:
+                    boost_text = menu_font.render(" РАЗГОН! ", True, YELLOW, RED)
+                screen.blit(boost_text, (WIDTH // 2 - boost_text.get_width() // 2, HEIGHT // 2 - 100))
+            else:
+                boost_alert = False
 
         # === ЭКРАН ПОБЕДЫ — НАКЛАДЫВАЕТСЯ ПОВЕРХ ===
         if game_over:
